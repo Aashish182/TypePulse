@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Data Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: url('img/bg2.jpg') no-repeat center center fixed;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            background: linear-gradient(135deg, #f9fdff, #d4dee1, #d5eef9);
+            padding: 20px;
+            border-radius: 50px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #download-btn {
+            background-color: #007BFF;
+        }
+
+        #download-btn:hover {
+            background-color: #0056b3;
+        }
+
+        canvas#typingGraph {
+            width: 60% !important;
+            height: 300px !important; /* Medium size adjustment */
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Typing Data Analysis</h1>
+
+        <!-- Button to go back -->
+        <button id="back-btn">Back to Home</button>
+
+        <!-- Download Button -->
+        <button id="download-btn">Download Data and Chart</button>
+
+        <!-- Display the table of results -->
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>Date & Time</th>
+                    <th>WPM</th>
+                    <th>CPM</th>
+                    <th>Mistakes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data rows will be populated by JavaScript -->
+            </tbody>
+        </table>
+
+        <!-- Chart container -->
+        <div>
+            <canvas id="typingGraph"></canvas>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Fetching the data from the PHP script (fetchAllData.php)
+            fetch('fetchAllData.php')  // Ensure this file is available on your server
+                .then(response => response.json())  // Parse the JSON response
+                .then(data => {
+                    // Log fetched data for debugging
+                    console.log("Fetched Data:", data);
+
+                    // Check if the response has data
+                    if (data.length === 0) {
+                        alert("No data found.");
+                        return;
+                    }
+
+                    const tableBody = document.querySelector('#data-table tbody');
+
+                    // Use let for accumulating values (so we can change them)
+                    let wpmData = 0;
+                    let cpmData = 0;
+                    let mistakesData = 0;
+
+                    // Populate the table and prepare data for the chart
+                    data.forEach(item => {
+                        // Create a new row in the table for each data entry
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.timestamp}</td>  <!-- Using timestamp to display the date/time -->
+                            <td>${item.wpm}</td>
+                            <td>${item.cpm}</td>
+                            <td>${item.mistakes}</td>
+                        `;
+                        tableBody.appendChild(row);
+
+                        // Accumulate the data for the pie chart
+                        wpmData += item.wpm;
+                        cpmData += item.cpm;
+                        mistakesData += item.mistakes;
+                    });
+
+                    // Create the pie chart using Chart.js
+                    const ctx = document.getElementById('typingGraph').getContext('2d');
+                    const typingGraph = new Chart(ctx, {
+                        type: 'pie',  // Change the chart type to 'pie'
+                        data: {
+                            labels: ['WPM', 'CPM', 'Mistakes'],  // Labels for the pie chart
+                            datasets: [{
+                                data: [wpmData, cpmData, mistakesData],  // Data for WPM, CPM, and Mistakes
+                                backgroundColor: ['#4CAF50', '#2196F3', '#F44336'],  // Colors for each segment
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(tooltipItem) {
+                                            // Format the label to display data nicely
+                                            return tooltipItem.label + ': ' + tooltipItem.raw;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                });
+
+            // Event listener for the back button
+            document.getElementById('back-btn').addEventListener('click', function () {
+                window.location.href = 'index.html'; // Modify this as needed to redirect to your home page
+            });
+
+            // Function to download data as CSV
+            document.getElementById('download-btn').addEventListener('click', function () {
+                // Download the table data as CSV
+                const table = document.getElementById('data-table');
+                let csvData = [];
+                let rows = table.querySelectorAll('tr');
+
+                rows.forEach((row, index) => {
+                    let rowData = [];
+                    let cols = row.querySelectorAll('th, td');
+                    cols.forEach(col => rowData.push(col.innerText));
+                    if (rowData.length > 0) csvData.push(rowData.join(','));
+                });
+
+                const csvString = csvData.join('\n');
+                const blob = new Blob([csvString], { type: 'text/csv' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'typing_data.csv';
+                link.click();
+
+                // Download the chart as an image (PNG)
+                const chart = document.getElementById('typingGraph');
+                const chartInstance = Chart.getChart(chart);
+                const imageURL = chartInstance.toBase64Image();
+
+                const imageLink = document.createElement('a');
+                imageLink.href = imageURL;
+                imageLink.download = 'typing_chart.png';
+                imageLink.click();
+            });
+        });
+    </script>
+</body>
+</html>
